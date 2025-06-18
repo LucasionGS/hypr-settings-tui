@@ -9,29 +9,38 @@ export default class Hyprland {
       {
         id: 1,
         name: "HDMI-A-1",
-        resolution: { width: 1920, height: 1080 },
-        position: { x: 0, y: 0 },
+        width: 1920,
+        height: 1080,
+        x: 0,
+        y: 0,
         refreshRate: 60,
-        isPrimary: true,
-        isEnabled: true,
+        disabled: false,
+        scale: 1.0,
+        availableModes: ["1920x1080@60Hz"]
       },
       {
         id: 2,
         name: "DP-1",
-        resolution: { width: 1920, height: 1080 },
-        position: { x: 1920, y: 0 },
+        width: 1920,
+        height: 1080,
+        x: 1920,
+        y: 0,
         refreshRate: 144,
-        isPrimary: false,
-        isEnabled: true,
+        disabled: false,
+        scale: 1.0,
+        availableModes: ["1920x1080@60Hz"]
       },
       {
         id: 3,
         name: "DP-2",
-        resolution: { width: 1920, height: 1080 },
-        position: { x: 1920, y: 1080 },
+        width: 1920,
+        height: 1080,
+        x: 1920,
+        y: 1080,
         refreshRate: 144,
-        isPrimary: false,
-        isEnabled: true,
+        disabled: false,
+        scale: 1.0,
+        availableModes: ["1920x1080@60Hz"]
       },
     ];
   }
@@ -61,15 +70,13 @@ export default class Hyprland {
 export interface Monitor {
   id: number;
   name: string;
-  resolution: {
-    width: number;
-    height: number;
-  };
-  position: {
-    x: number;
-    y: number;
-  };
+  width: number;
+  height: number;
+  x: number;
+  y: number;
   refreshRate: number;
-  isPrimary: boolean;
-  isEnabled: boolean;
+  isPrimary?: boolean; // Not used in Hyprland
+  disabled: boolean;
+  scale: number;
+  availableModes: string[]
 }

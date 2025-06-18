@@ -49,8 +49,8 @@ function drawMonitorVisual(monitor: Monitor, x: number, y: number, isSelected: b
   const scale = 0.005 * (monitor.id === 2 ? 0.5 : 1); // Small scale factor
   
   // Calculate dimensions while preserving aspect ratio
-  const rawWidth = Math.round(monitor.resolution.width * scale);
-  const rawHeight = Math.round(monitor.resolution.height * scale);
+  const rawWidth = Math.round(monitor.width * scale);
+  const rawHeight = Math.round(monitor.height * scale);
   
   // Ensure monitors have at least minimum dimensions
   const width = Math.max(13, rawWidth - 2);
@@ -59,7 +59,7 @@ function drawMonitorVisual(monitor: Monitor, x: number, y: number, isSelected: b
   // Draw border with different color if selected
   if (isSelected) {
     setColor(33, 44); // Bright yellow on blue
-  } else if (!monitor.isEnabled) {
+  } else if (monitor.disabled) {
     setColor(90); // Dim gray for disabled monitors
   } else if (monitor.isPrimary) {
     setColor(32); // Green for primary monitor
@@ -78,7 +78,7 @@ function drawMonitorVisual(monitor: Monitor, x: number, y: number, isSelected: b
   
   // Draw resolution on second line
   setCursor(x, y + 2);
-  const resText = `${monitor.resolution.width}x${monitor.resolution.height}`;
+  const resText = `${monitor.width}x${monitor.height}`;
   write("│" + resText.padEnd(width - 2, ' ') + "│");
   
   // Add refresh rate info on third line
@@ -113,7 +113,7 @@ function renderMonitorList() {
     // Different display for selected monitor
     if (index === selectedMonitorIndex) {
       setColor(30, 47); // Black on white for selected
-    } else if (!monitor.isEnabled) {
+    } else if (monitor.disabled) {
       setColor(90); // Dim gray for disabled
     } else if (monitor.isPrimary) {
       setColor(32); // Green for primary
@@ -121,10 +121,10 @@ function renderMonitorList() {
     
     // Format with consistent spacing and more info
     const primaryMarker = monitor.isPrimary ? "*" : " ";
-    const statusText = monitor.isEnabled ? "On " : "Off";
+    const statusText = !monitor.disabled ? "On " : "Off";
     const nameText = monitor.name.padEnd(10, ' ');
     
-    write(`${primaryMarker} ${nameText} [${statusText}] ${monitor.resolution.width}x${monitor.resolution.height}`);
+    write(`${primaryMarker} ${nameText} [${statusText}] ${monitor.width}x${monitor.height}`);
     resetColor();
   });
 }
@@ -140,10 +140,10 @@ function renderMonitorDetails() {
   
   // Properties
   const properties = [
-    { name: "Resolution", value: `${monitor.resolution.width}x${monitor.resolution.height}`, key: "resolution" },
-    { name: "Position", value: `X:${monitor.position.x} Y:${monitor.position.y}`, key: "position" },
+    { name: "Resolution", value: `${monitor.width}x${monitor.height}`, key: "resolution" },
+    { name: "Position", value: `X:${monitor.x} Y:${monitor.y}`, key: "position" },
     { name: "Refresh Rate", value: `${monitor.refreshRate} Hz`, key: "refreshRate" },
-    { name: "Enabled", value: monitor.isEnabled ? "Yes" : "No", key: "enabled" },
+    { name: "Enabled", value: !monitor.disabled ? "Yes" : "No", key: "enabled" },
     { name: "Primary", value: monitor.isPrimary ? "Yes" : "No" },
   ];
   
@@ -186,12 +186,12 @@ function renderMonitorLayout() {
   let maxY = -Infinity;
   
   monitors.forEach(monitor => {
-    if (!monitor.isEnabled) return;
+    if (monitor.disabled) return;
     
-    minX = Math.min(minX, monitor.position.x);
-    minY = Math.min(minY, monitor.position.y);
-    maxX = Math.max(maxX, monitor.position.x + monitor.resolution.width);
-    maxY = Math.max(maxY, monitor.position.y + monitor.resolution.height);
+    minX = Math.min(minX, monitor.x);
+    minY = Math.min(minY, monitor.y);
+    maxX = Math.max(maxX, monitor.x + monitor.width);
+    maxY = Math.max(maxY, monitor.y + monitor.height);
   });
   
   // If no monitors are enabled, set defaults
@@ -218,40 +218,40 @@ function renderMonitorLayout() {
   const offsetY = startY + Math.round((boxHeight - (maxY - minY) * scale) / 2);
   
   // Get enabled monitors and find primary
-  const enabledMonitors = monitors.filter(m => m.isEnabled);
+  const enabledMonitors = monitors.filter(m => !m.disabled);
   // const primaryMonitor = enabledMonitors.find(m => m.isPrimary);
   
   // Draw each monitor - sort by position so the layout is clearer
   enabledMonitors
     .sort((a, b) => {
       // Sort by Y position first, then X
-      if (a.position.y !== b.position.y) {
-        return a.position.y - b.position.y;
+      if (a.y !== b.y) {
+        return a.y - b.y;
       }
-      return a.position.x - b.position.x;
+      return a.x - b.x;
     })
     .forEach((monitor) => {
-      const x = offsetX + Math.round((monitor.position.x - minX) * scale);
-      const y = offsetY + Math.round(Math.round((monitor.position.y - minY) * scale) / 2);
+      const x = offsetX + Math.round((monitor.x - minX) * scale);
+      const y = offsetY + Math.round(Math.round((monitor.y - minY) * scale) / 2);
       
       // Draw connector lines to show relative positioning
       // if (primaryMonitor && monitor.id !== primaryMonitor.id) {
-      //   const primaryX = offsetX + Math.round((primaryMonitor.position.x - minX) * scale);
-      //   const primaryY = Math.round(offsetY + Math.round((primaryMonitor.position.y - minY) * scale) / 2);
+      //   const primaryX = offsetX + Math.round((primaryMonitor.x - minX) * scale);
+      //   const primaryY = Math.round(offsetY + Math.round((primaryMonitor.y - minY) * scale) / 2);
         
       //   // Calculate midpoints and draw indicators
       //   setColor(90); // Dim gray
         
       //   // Draw lines based on relative positions
-      //   if (monitor.position.x > primaryMonitor.position.x) {
+      //   if (monitor.x > primaryMonitor.x) {
       //     // Monitor is to the right of primary
       //     setCursor(primaryX + 10, primaryY + 1);
       //     // write("────→");
-      //   } else if (monitor.position.x < primaryMonitor.position.x) {
+      //   } else if (monitor.x < primaryMonitor.x) {
       //     // Monitor is to the left of primary
       //     setCursor(x + 10, primaryY + 1);
       //     // write("←────");
-      //   } else if (monitor.position.y > primaryMonitor.position.y) {
+      //   } else if (monitor.y > primaryMonitor.y) {
       //     // Monitor is below primary
       //     for (let i = 0; i < 2; i++) {
       //       setCursor(primaryX + 5, primaryY + 3 + i);
@@ -294,25 +294,25 @@ function handleEditInput(key: string) {
   switch (selectedProperty) {
     case "resolution":
       if (key === "ArrowUp") {
-        monitor.resolution.height += 10;
-      } else if (key === "ArrowDown" && monitor.resolution.height > 10) {
-        monitor.resolution.height -= 10;
+        monitor.height += 10;
+      } else if (key === "ArrowDown" && monitor.height > 10) {
+        monitor.height -= 10;
       } else if (key === "ArrowRight") {
-        monitor.resolution.width += 10;
-      } else if (key === "ArrowLeft" && monitor.resolution.width > 10) {
-        monitor.resolution.width -= 10;
+        monitor.width += 10;
+      } else if (key === "ArrowLeft" && monitor.width > 10) {
+        monitor.width -= 10;
       }
       break;
       
     case "position":
       if (key === "ArrowUp") {
-        monitor.position.y -= 10;
+        monitor.y -= 10;
       } else if (key === "ArrowDown") {
-        monitor.position.y += 10;
+        monitor.y += 10;
       } else if (key === "ArrowRight") {
-        monitor.position.x += 10;
+        monitor.x += 10;
       } else if (key === "ArrowLeft") {
-        monitor.position.x -= 10;
+        monitor.x -= 10;
       }
       break;
       
@@ -326,7 +326,7 @@ function handleEditInput(key: string) {
       
     case "enabled":
       if (key === " " || key === "ArrowRight" || key === "ArrowLeft") {
-        monitor.isEnabled = !monitor.isEnabled;
+        monitor.disabled = !monitor.disabled;
       }
       break;
   }
@@ -364,35 +364,6 @@ function handleNavInput(key: string) {
         isEditing = true;
       }
       break;
-      
-    // case "p":
-    //   // Toggle primary monitor
-    //   monitors.forEach(m => m.isPrimary = false);
-    //   monitors[selectedMonitorIndex].isPrimary = true;
-    //   break;
-      
-    // case "n": {
-    //   // Add a new monitor
-    //   const newId = monitors.length + 1;
-    //   monitors.push({
-    //     id: newId,
-    //     name: `Monitor-${newId}`,
-    //     resolution: { width: 1920, height: 1080 },
-    //     position: { x: 0, y: 0 },
-    //     refreshRate: 60,
-    //     isPrimary: false,
-    //     isEnabled: true,
-    //   });
-    //   break;
-    // }
-      
-    // case "Delete":
-    //   // Remove the current monitor if there's more than one
-    //   if (monitors.length > 1) {
-    //     monitors = monitors.filter((_, i) => i !== selectedMonitorIndex);
-    //     selectedMonitorIndex = Math.min(selectedMonitorIndex, monitors.length - 1);
-    //   }
-    //   break;
   }
 }
 
@@ -408,7 +379,7 @@ function render() {
   // Show help text at bottom - ensure it's below all other UI elements
   const helpY = 40; // Positioned well below the layout box
   setCursor(1, helpY);
-  write("Controls: ↑/↓ - Select monitor | Tab - Select property | Enter - Edit | P - Set as primary | N - New monitor | Del - Remove");
+  write("Controls: ↑/↓ - Select monitor | Tab - Select property | Enter - Edit");
   setCursor(1, helpY + 1);
   write("When editing: ↑/↓/←/→ - Adjust values | Enter/Esc - Done");
   
@@ -484,11 +455,17 @@ async function main() {
     
     // Generate config file (mock for now)
     write("\nMonitor Configuration:\n");
+    let data = "";
+    data += "######################################################\n";
+    data += "## DO NOT EDIT THIS FILE!                           ##\n";
+    data += "## This file is automatically generated by Archion. ##\n";
+    data += "######################################################\n";
     monitors.forEach(monitor => {
-      if (monitor.isEnabled) {
-        write(`monitor=${monitor.name},${monitor.resolution.width}x${monitor.resolution.height}@${monitor.refreshRate},${monitor.position.x}x${monitor.position.y},${monitor.isPrimary ? 1 : 0}\n`);
+      if (!monitor.disabled) {
+        data += `monitor = ${monitor.name}, ${monitor.width}x${monitor.height}@${monitor.refreshRate}, ${monitor.x}x${monitor.y}, ${monitor.scale.toPrecision(2)}\n`;
       }
     });
+    write(data);
   }
 }
 
