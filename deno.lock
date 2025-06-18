@@ -2,7 +2,8 @@
   "version": "5",
   "specifiers": {
     "jsr:@std/assert@1": "1.0.13",
-    "jsr:@std/internal@^1.0.6": "1.0.6"
+    "jsr:@std/internal@^1.0.6": "1.0.6",
+    "npm:@types/node@^24.0.3": "24.0.3"
   },
   "jsr": {
     "@std/assert@1.0.13": {
@@ -15,13 +16,25 @@
       "integrity": "9533b128f230f73bd209408bb07a4b12f8d4255ab2a4d22a1fd6d87304aca9a4"
     }
   },
+  "npm": {
+    "@types/node@24.0.3": {
+      "integrity": "sha512-R4I/kzCYAdRLzfiCabn9hxWfbuHS573x+r0dJMkkzThEa7pbrcDWK+9zu3e7aBOouf+rQAciqPFMnxwr0aWgKg==",
+      "dependencies": [
+        "undici-types"
+      ]
+    },
+    "undici-types@7.8.0": {
+      "integrity": "sha512-9UJ2xGDvQ43tYyVMpuHlsgApydB8ZKfVYTsLDhXkFL/6gfkp+U8xTGdh8pMJv1SpZna0zxG1DwsKZsreLbXBxw=="
+    }
+  },
   "remote": {
     "https://deno.land/std@0.220.1/encoding/_util.ts": "beacef316c1255da9bc8e95afb1fa56ed69baef919c88dc06ae6cb7a6103d376",
     "https://deno.land/std@0.220.1/encoding/base64.ts": "8ccae67a1227b875340a8582ff707f37b131df435b07080d3bb58e07f5f97807"
   },
   "workspace": {
     "dependencies": [
-      "jsr:@std/assert@1"
+      "jsr:@std/assert@1",
+      "npm:@types/node@^24.0.3"
     ]
   }
 }

@@ -1,7 +1,7 @@
 export default class Hyprland {
-  private monitorId: string;
-  constructor(monitorId: string) {
-    this.monitorId = monitorId;
+  private instanceId?: string;
+  constructor(instanceId?: string) {
+    this.instanceId = instanceId;
   }
 
   public static getMockData(): Monitor[] {
@@ -16,19 +16,31 @@ export default class Hyprland {
         refreshRate: 60,
         disabled: false,
         scale: 1.0,
-        availableModes: ["1920x1080@60Hz"]
+        availableModes: [
+          "1920x1080@60Hz", 
+          "1600x900@60Hz", 
+          "1366x768@60Hz",
+          "1280x720@60Hz"
+        ]
       },
       {
         id: 2,
         name: "DP-1",
-        width: 1920,
-        height: 1080,
+        width: 2560,
+        height: 1440,
         x: 1920,
         y: 0,
         refreshRate: 144,
         disabled: false,
         scale: 1.0,
-        availableModes: ["1920x1080@60Hz"]
+        availableModes: [
+          "2560x1440@144Hz",
+          "2560x1440@120Hz",
+          "2560x1440@60Hz",
+          "1920x1080@144Hz",
+          "1920x1080@120Hz",
+          "1920x1080@60Hz"
+        ]
       },
       {
         id: 3,
@@ -40,14 +52,24 @@ export default class Hyprland {
         refreshRate: 144,
         disabled: false,
         scale: 1.0,
-        availableModes: ["1920x1080@60Hz"]
+        availableModes: [
+          "1920x1080@144Hz",
+          "1920x1080@120Hz",
+          "1920x1080@60Hz",
+          "1600x900@144Hz",
+          "1600x900@60Hz"
+        ]
       },
     ];
   }
 
   public getMonitors(): Promise<Monitor[]> {
     return new Deno.Command("hyprctl", {
-      args: ["monitors", "-j"],
+      args: [
+        ...(this.instanceId ? ["-i", this.instanceId] : []),
+        "monitors",
+        "-j"
+      ],
       stdout: "piped",
     })
       .output()
@@ -75,7 +97,6 @@ export interface Monitor {
   x: number;
   y: number;
   refreshRate: number;
-  isPrimary?: boolean; // Not used in Hyprland
   disabled: boolean;
   scale: number;
   availableModes: string[]

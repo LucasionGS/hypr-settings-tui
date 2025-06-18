@@ -1,7 +1,10 @@
+import { CONFIG_DIR, CONFIG_FILE } from "./config.ts";
 import Hyprland, { Monitor } from "./Hyprland.ts";
 
 // Mock data for monitors
-const monitors: Monitor[] = Hyprland.getMockData();
+// const monitors: Monitor[] = Hyprland.getMockData();
+const hypr = new Hyprland();
+const monitors: Monitor[] = await hypr.getMonitors();
 
 // UI state
 let selectedMonitorIndex = 0;
@@ -61,8 +64,6 @@ function drawMonitorVisual(monitor: Monitor, x: number, y: number, isSelected: b
     setColor(33, 44); // Bright yellow on blue
   } else if (monitor.disabled) {
     setColor(90); // Dim gray for disabled monitors
-  } else if (monitor.isPrimary) {
-    setColor(32); // Green for primary monitor
   } else {
     setColor(37); // White for normal monitors
   }
@@ -73,8 +74,7 @@ function drawMonitorVisual(monitor: Monitor, x: number, y: number, isSelected: b
   
   // Draw sides and content - monitor name
   setCursor(x, y + 1);
-  const nameText = monitor.isPrimary ? `*${monitor.name}` : monitor.name;
-  write("│" + nameText.padEnd(width - 2, ' ') + "│");
+  write("│" + monitor.name.padEnd(width - 2, ' ') + "│");
   
   // Draw resolution on second line
   setCursor(x, y + 2);
@@ -115,16 +115,13 @@ function renderMonitorList() {
       setColor(30, 47); // Black on white for selected
     } else if (monitor.disabled) {
       setColor(90); // Dim gray for disabled
-    } else if (monitor.isPrimary) {
-      setColor(32); // Green for primary
     }
     
     // Format with consistent spacing and more info
-    const primaryMarker = monitor.isPrimary ? "*" : " ";
     const statusText = !monitor.disabled ? "On " : "Off";
     const nameText = monitor.name.padEnd(10, ' ');
     
-    write(`${primaryMarker} ${nameText} [${statusText}] ${monitor.width}x${monitor.height}`);
+    write(`  ${nameText} [${statusText}] ${monitor.width}x${monitor.height}`);
     resetColor();
   });
 }
@@ -138,13 +135,25 @@ function renderMonitorDetails() {
   // Create a wider box for monitor details
   drawBox(33, 1, 50, 16, `Monitor: ${monitor.name}`);
   
+  // Parse available modes
+  const { resolutions, refreshRates } = parseAvailableModes(monitor.availableModes);
+  
   // Properties
   const properties = [
-    { name: "Resolution", value: `${monitor.width}x${monitor.height}`, key: "resolution" },
+    { 
+      name: "Resolution", 
+      value: `${monitor.width}x${monitor.height}`, 
+      key: "resolution",
+      options: resolutions.length > 0 ? `(${currentResolutionIndex + 1}/${resolutions.length})` : ""
+    },
     { name: "Position", value: `X:${monitor.x} Y:${monitor.y}`, key: "position" },
-    { name: "Refresh Rate", value: `${monitor.refreshRate} Hz`, key: "refreshRate" },
+    { 
+      name: "Refresh Rate", 
+      value: `${monitor.refreshRate} Hz`, 
+      key: "refreshRate",
+      options: refreshRates.length > 0 ? `(${currentRefreshRateIndex + 1}/${refreshRates.length})` : ""
+    },
     { name: "Enabled", value: !monitor.disabled ? "Yes" : "No", key: "enabled" },
-    { name: "Primary", value: monitor.isPrimary ? "Yes" : "No" },
   ];
   
   properties.forEach((prop, index) => {
@@ -157,15 +166,31 @@ function renderMonitorDetails() {
     
     // Format property values with consistent width
     const propName = prop.name.padEnd(14, ' ');
-    write(`${propName}: ${isEditing && selectedProperty === prop.key ? ">" : ""} ${prop.value} ${isEditing && selectedProperty === prop.key ? "<" : ""}`);
+    let displayValue = prop.value;
+    
+    // Add edit indicators and options info
+    if (isEditing && selectedProperty === prop.key) {
+      // Different display for editing mode
+      setColor(33, 44); // Yellow on blue for active editing
+      displayValue = `< ${displayValue} >`;
+    }
+    
+    // Add options info for resolution and refresh rate
+    if (prop.options) {
+      displayValue += ` ${prop.options}`;
+    }
+    
+    write(`${propName}: ${displayValue}`);
     resetColor();
   });
   
   // Instructions
-  setCursor(startX, startY + 12);
+  setCursor(startX, startY + 11);
   write("Press TAB to select property");
-  setCursor(startX, startY + 13);
+  setCursor(startX, startY + 12);
   write("Press ENTER to edit selected property");
+  setCursor(startX, startY + 13);
+  write("Press p to set as primary monitor");
   setCursor(startX, startY + 14);
   write("Press ESC to exit");
 }
@@ -217,9 +242,8 @@ function renderMonitorLayout() {
   const offsetX = startX + Math.round((boxWidth - (maxX - minX) * scale) / 2);
   const offsetY = startY + Math.round((boxHeight - (maxY - minY) * scale) / 2);
   
-  // Get enabled monitors and find primary
+  // Get enabled monitors
   const enabledMonitors = monitors.filter(m => !m.disabled);
-  // const primaryMonitor = enabledMonitors.find(m => m.isPrimary);
   
   // Draw each monitor - sort by position so the layout is clearer
   enabledMonitors
@@ -234,46 +258,55 @@ function renderMonitorLayout() {
       const x = offsetX + Math.round((monitor.x - minX) * scale);
       const y = offsetY + Math.round(Math.round((monitor.y - minY) * scale) / 2);
       
-      // Draw connector lines to show relative positioning
-      // if (primaryMonitor && monitor.id !== primaryMonitor.id) {
-      //   const primaryX = offsetX + Math.round((primaryMonitor.x - minX) * scale);
-      //   const primaryY = Math.round(offsetY + Math.round((primaryMonitor.y - minY) * scale) / 2);
-        
-      //   // Calculate midpoints and draw indicators
-      //   setColor(90); // Dim gray
-        
-      //   // Draw lines based on relative positions
-      //   if (monitor.x > primaryMonitor.x) {
-      //     // Monitor is to the right of primary
-      //     setCursor(primaryX + 10, primaryY + 1);
-      //     // write("────→");
-      //   } else if (monitor.x < primaryMonitor.x) {
-      //     // Monitor is to the left of primary
-      //     setCursor(x + 10, primaryY + 1);
-      //     // write("←────");
-      //   } else if (monitor.y > primaryMonitor.y) {
-      //     // Monitor is below primary
-      //     for (let i = 0; i < 2; i++) {
-      //       setCursor(primaryX + 5, primaryY + 3 + i);
-      //       write("│");
-      //     }
-      //     setCursor(primaryX + 5, primaryY + 5);
-      //     write("↓");
-      //   } else {
-      //     // Monitor is above primary
-      //     for (let i = 0; i < 2; i++) {
-      //       setCursor(primaryX + 5, y + 3 + i);
-      //       write("│");
-      //     }
-      //     setCursor(primaryX + 5, y + 3);
-      //     write("↑");
-      //   }
-      //   resetColor();
-      // }
-      
       drawMonitorVisual(monitor, x, y, monitor.id === monitors[selectedMonitorIndex].id);
     });
 }
+
+// Parse available modes into resolution and refresh rate options
+function parseAvailableModes(modes: string[]): { resolutions: string[], refreshRates: number[] } {
+  const resolutions = new Set<string>();
+  const refreshRates = new Set<number>();
+  
+  // Handle empty modes array
+  if (!modes || modes.length === 0) {
+    return {
+      resolutions: ["1920x1080"],  // Default fallback resolution
+      refreshRates: [60]          // Default fallback refresh rate
+    };
+  }
+  
+  modes.forEach(mode => {
+    // Mode format is typically "widthxheight@refreshRateHz"
+    const match = mode.match(/(\d+)x(\d+)@(\d+)Hz/);
+    if (match) {
+      const width = parseInt(match[1]);
+      const height = parseInt(match[2]);
+      const rate = parseInt(match[3]);
+      
+      resolutions.add(`${width}x${height}`);
+      refreshRates.add(rate);
+    }
+  });
+  
+  // If no valid modes were parsed, add default fallbacks
+  if (resolutions.size === 0) resolutions.add("1920x1080");
+  if (refreshRates.size === 0) refreshRates.add(60);
+  
+  return {
+    // Sort resolutions by total pixels (descending)
+    resolutions: Array.from(resolutions).sort((a, b) => {
+      const [aWidth, aHeight] = a.split("x").map(Number);
+      const [bWidth, bHeight] = b.split("x").map(Number);
+      return (bWidth * bHeight) - (aWidth * aHeight);
+    }),
+    // Sort refresh rates in ascending order
+    refreshRates: Array.from(refreshRates).sort((a, b) => a - b)
+  };
+}
+
+// Current selection index for resolution and refresh rate
+let currentResolutionIndex = 0;
+let currentRefreshRateIndex = 0;
 
 // Handle user input for editing monitor properties
 function handleEditInput(key: string) {
@@ -292,17 +325,27 @@ function handleEditInput(key: string) {
   }
   
   switch (selectedProperty) {
-    case "resolution":
-      if (key === "ArrowUp") {
-        monitor.height += 10;
-      } else if (key === "ArrowDown" && monitor.height > 10) {
-        monitor.height -= 10;
-      } else if (key === "ArrowRight") {
-        monitor.width += 10;
-      } else if (key === "ArrowLeft" && monitor.width > 10) {
-        monitor.width -= 10;
+    case "resolution": {
+      // Parse available modes
+      const { resolutions } = parseAvailableModes(monitor.availableModes);
+      
+      if (resolutions.length === 0) break;
+      
+      if (key === "ArrowUp" || key === "ArrowRight") {
+        // Move to next resolution
+        currentResolutionIndex = (currentResolutionIndex + 1) % resolutions.length;
+      } else if (key === "ArrowDown" || key === "ArrowLeft") {
+        // Move to previous resolution
+        currentResolutionIndex = (currentResolutionIndex - 1 + resolutions.length) % resolutions.length;
       }
+      
+      // Update monitor resolution
+      const newRes = resolutions[currentResolutionIndex];
+      const [width, height] = newRes.split("x").map(Number);
+      monitor.width = width;
+      monitor.height = height;
       break;
+    }
       
     case "position":
       if (key === "ArrowUp") {
@@ -316,17 +359,44 @@ function handleEditInput(key: string) {
       }
       break;
       
-    case "refreshRate":
-      if (key === "ArrowUp") {
-        monitor.refreshRate += 1;
-      } else if (key === "ArrowDown" && monitor.refreshRate > 1) {
-        monitor.refreshRate -= 1;
+    case "refreshRate": {
+      // Parse available modes
+      const { refreshRates } = parseAvailableModes(monitor.availableModes);
+      
+      if (refreshRates.length === 0) break;
+      
+      if (key === "ArrowUp" || key === "ArrowRight") {
+        // Move to next refresh rate
+        currentRefreshRateIndex = (currentRefreshRateIndex + 1) % refreshRates.length;
+      } else if (key === "ArrowDown" || key === "ArrowLeft") {
+        // Move to previous refresh rate
+        currentRefreshRateIndex = (currentRefreshRateIndex - 1 + refreshRates.length) % refreshRates.length;
       }
+      
+      // Update monitor refresh rate
+      monitor.refreshRate = refreshRates[currentRefreshRateIndex];
       break;
+    }
       
     case "enabled":
       if (key === " " || key === "ArrowRight" || key === "ArrowLeft") {
         monitor.disabled = !monitor.disabled;
+        
+        // If enabling a previously disabled monitor, ensure it has a valid position
+        if (!monitor.disabled && (monitor.x === 0 && monitor.y === 0)) {
+          // Find the rightmost monitor
+          let maxX = 0;
+          monitors.forEach(m => {
+            if (!m.disabled && m.id !== monitor.id) {
+              maxX = Math.max(maxX, m.x + m.width);
+            }
+          });
+          
+          // Position the newly enabled monitor to the right of the existing monitors
+          if (maxX > 0) {
+            monitor.x = maxX;
+          }
+        }
       }
       break;
   }
@@ -343,11 +413,15 @@ function handleNavInput(key: string) {
     case "ArrowUp":
       selectedMonitorIndex = Math.max(0, selectedMonitorIndex - 1);
       selectedProperty = null;
+      // Reset selection indices when changing monitors
+      updateSelectionIndices();
       break;
       
     case "ArrowDown":
       selectedMonitorIndex = Math.min(monitors.length - 1, selectedMonitorIndex + 1);
       selectedProperty = null;
+      // Reset selection indices when changing monitors
+      updateSelectionIndices();
       break;
       
     case "Tab": {
@@ -362,8 +436,29 @@ function handleNavInput(key: string) {
     case "Enter":
       if (selectedProperty) {
         isEditing = true;
+        // Update selection indices when entering edit mode
+        updateSelectionIndices();
       }
       break;
+  }
+}
+
+// Update selection indices based on current monitor
+function updateSelectionIndices() {
+  const monitor = monitors[selectedMonitorIndex];
+  
+  if (monitor) {
+    // Update resolution index
+    const { resolutions, refreshRates } = parseAvailableModes(monitor.availableModes);
+    
+    // Find current resolution in the list
+    const currentRes = `${monitor.width}x${monitor.height}`;
+    currentResolutionIndex = resolutions.indexOf(currentRes);
+    if (currentResolutionIndex === -1) currentResolutionIndex = 0;
+    
+    // Find current refresh rate in the list
+    currentRefreshRateIndex = refreshRates.indexOf(monitor.refreshRate);
+    if (currentRefreshRateIndex === -1) currentRefreshRateIndex = 0;
   }
 }
 
@@ -382,8 +477,8 @@ function render() {
   write("Controls: ↑/↓ - Select monitor | Tab - Select property | Enter - Edit");
   setCursor(1, helpY + 1);
   write("When editing: ↑/↓/←/→ - Adjust values | Enter/Esc - Done");
-  
-  showCursor();
+  setCursor(1, helpY + 2);
+  write("q/Esc - Exit");
 }
 
 // Main application loop
@@ -394,6 +489,9 @@ async function main() {
   write("Starting Hypr Settings TUI...\n\n");
   
   try {
+    // Initialize selection indices
+    updateSelectionIndices();
+    
     // Initial render
     render();
     
@@ -406,69 +504,87 @@ async function main() {
       let key = "";
       
       // Parse key from buffer
-      if (buffer[0] === 27) {
-        // ESC sequence
-        if (buffer[1] === 91) {
+      if (nread === 3) {
+        // Special keys (Arrow keys, etc.)
+        if (buffer[0] === 27 && buffer[1] === 91) {
+          // ESC [
           switch (buffer[2]) {
-            case 65: key = "ArrowUp"; break;
-            case 66: key = "ArrowDown"; break;
-            case 67: key = "ArrowRight"; break;
-            case 68: key = "ArrowLeft"; break;
-            default: key = "Escape";
+            case 65: key = "ArrowUp"; break;    // Up
+            case 66: key = "ArrowDown"; break; // Down
+            case 67: key = "ArrowRight"; break; // Right
+            case 68: key = "ArrowLeft"; break;  // Left
+            case 51: key = "Delete"; break;    // Delete (mapped from 3~)
+            // Add other special keys if needed
           }
-        } else {
-          key = "Escape";
         }
-      } else if (buffer[0] === 13) {
-        key = "Enter";
-      } else if (buffer[0] === 9) {
-        key = "Tab";
-      } else if (buffer[0] === 127) {
-        key = "Backspace";
-      } else if (buffer[0] === 32) {
-        key = " ";
-      } else if (buffer[0] === 112) {
-        key = "p";
-      } else if (buffer[0] === 110) {
-        key = "n";
-      } else if (buffer[0] === 100) {
-        key = "Delete";
-      } else {
-        key = String.fromCharCode(buffer[0]);
+      } else if (nread === 1) {
+        // Regular keys
+        switch (buffer[0]) {
+          case 9: key = "Tab"; break;         // Tab key
+          case 13: key = "Enter"; break;      // Enter key
+          case 27: key = "Escape"; break;     // Escape key
+          case 32: key = " "; break;          // Space key
+          case 127: key = "Backspace"; break; // Backspace key
+          default:
+            // Convert other keys to characters
+            if (buffer[0] >= 32 && buffer[0] <= 126) { // Printable ASCII
+              key = String.fromCharCode(buffer[0]);
+            }
+            break;
+        }
       }
       
-      if (key === "q" || key === "Escape" && !isEditing) {
+      // Handle special cases for quit
+      if (key === "q" || (key === "Escape" && !isEditing)) {
         break;
       }
       
-      handleNavInput(key);
-      render();
+      // Handle input
+      if (key) {
+        handleNavInput(key);
+        render();
+      }
     }
+  } catch (error) {
+    console.error("Error in main loop:", error);
   } finally {
-    // Restore terminal state
+    // Cleanup: reset terminal settings
     Deno.stdin.setRaw(false);
-    showCursor();
+    setColor(37, 40); // Reset to normal colors
     resetColor();
-    clearScreen();
+    showCursor();
     setCursor(1, 1);
-    write("Hypr Settings TUI exited.\n");
     
-    // Generate config file (mock for now)
-    write("\nMonitor Configuration:\n");
+    // Clear the screen before exiting
+    clearScreen();
+    // Generate Hyprland config output
+    write("Hypr Settings TUI exited.\n\n");
+    write("Monitor Configuration:\n");
     let data = "";
     data += "######################################################\n";
-    data += "## DO NOT EDIT THIS FILE!                           ##\n";
-    data += "## This file is automatically generated by Archion. ##\n";
+    data += "## Monitor configuration file for Hyprland          ##\n";
     data += "######################################################\n";
     monitors.forEach(monitor => {
       if (!monitor.disabled) {
         data += `monitor = ${monitor.name}, ${monitor.width}x${monitor.height}@${monitor.refreshRate}, ${monitor.x}x${monitor.y}, ${monitor.scale.toPrecision(2)}\n`;
+      } else {
+        data += `monitor = ${monitor.name}, disabled\n`;
       }
     });
     write(data);
+
+    // Write to config file
+    try {
+      Deno.mkdirSync(CONFIG_DIR, { recursive: true });
+      const configFile = Deno.openSync(CONFIG_FILE, { write: true, create: true });
+      configFile.writeSync(encodeString(data));
+      configFile.close();
+      write("\nConfiguration saved to monitors.conf\n");
+    } catch (error) {
+      console.error("Error saving configuration:", error);
+    }
   }
 }
 
-if (import.meta.main) {
-  main();
-}
+// Start the application
+main();
