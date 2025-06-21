@@ -1,7 +1,7 @@
 export default class Hyprland {
   private instanceId?: string;
-  constructor(instanceId?: string) {
-    this.instanceId = instanceId;
+  constructor(instanceId?: string | number) {
+    this.instanceId = instanceId?.toString();
   }
 
   public static getMockData(): Monitor[] {
@@ -68,6 +68,7 @@ export default class Hyprland {
       args: [
         ...(this.instanceId ? ["-i", this.instanceId] : []),
         "monitors",
+        "all",
         "-j"
       ],
       stdout: "piped",
@@ -84,6 +85,18 @@ export default class Hyprland {
       .catch((error) => {
         console.error("Error fetching monitors:", error);
         return [];
+      });
+  }
+
+  public async hasInstance() {
+    return (this.instanceId !== undefined && this.instanceId !== null) || await new Deno.Command("hyprctl", {
+      args: ["monitors", "-j"]
+    })
+      .output()
+      .then((output) => {
+        return output.code === 0;
+      }).catch(() => {
+        return false;
       });
   }
 }
